@@ -1,4 +1,9 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useCallback
+} from 'react';
 import logo from './logo.svg';
 import './App.css';
 
@@ -6,48 +11,81 @@ function App() {
   const canvasRef = useRef(null);
   const [showFractal, setShowFractal] = useState(false);
 
-  // Recursive function to draw a simple fractal tree
-  const drawFractal = (ctx, startX, startY, length, angle, branchWidth) => {
-    ctx.lineWidth = branchWidth;
-    ctx.beginPath();
-    ctx.save();
+  /**
+   * 1) Use useCallback so this function reference remains stable between renders.
+   * 2) This prevents the ESLint warning about missing dependencies in useEffect.
+   */
+  const drawFractal = useCallback(
+    (ctx, startX, startY, length, angle, branchWidth) => {
+      ctx.lineWidth = branchWidth;
+      ctx.beginPath();
+      ctx.save();
 
-    // Move to the start position
-    ctx.translate(startX, startY);
-    ctx.rotate((angle * Math.PI) / 180);
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, -length);
-    ctx.strokeStyle = '#ffffff'; // White color for branches
-    ctx.stroke();
+      // Translate to start position and rotate
+      ctx.translate(startX, startY);
+      ctx.rotate((angle * Math.PI) / 180);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -length);
+      ctx.strokeStyle = '#ffffff'; // white color for branches
+      ctx.stroke();
 
-    // Base case: stop if branch is too short
-    if (length < 10) {
+      // Base case: if branch is too short, stop
+      if (length < 10) {
+        ctx.restore();
+        return;
+      }
+
+      // Recursively draw left branch
+      drawFractal(
+        ctx,
+        0,             // new startX
+        -length,       // new startY (above the current branch)
+        length * 0.7,  // shorten branch
+        angle - 20,    // turn left
+        branchWidth * 0.7
+      );
+
+      // Recursively draw right branch
+      drawFractal(
+        ctx,
+        0,
+        -length,
+        length * 0.7,
+        angle + 20,    // turn right
+        branchWidth * 0.7
+      );
+
       ctx.restore();
-      return;
-    }
+    },
+    []
+    // Empty array means "drawFractal" never changes;
+    // no external variables are used in the logic.
+  );
 
-    // Draw left branch
-    drawFractal(ctx, 0, -length, length * 0.7, angle - 20, branchWidth * 0.7);
-    // Draw right branch
-    drawFractal(ctx, 0, -length, length * 0.7, angle + 20, branchWidth * 0.7);
-
-    ctx.restore();
-  };
-
-  // When showFractal is set to true, draw the fractal on the canvas
   useEffect(() => {
     if (showFractal) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
-      // Clear the canvas before drawing
+
+      // Clear before drawing a new fractal
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw fractal from the bottom center of canvas
-      drawFractal(ctx, canvas.width / 2, canvas.height - 20, 100, 0, 10);
+      // Draw fractal from bottom-center of the canvas
+      drawFractal(
+        ctx,
+        canvas.width / 2,
+        canvas.height - 20,
+        100, // initial branch length
+        0,   // initial angle
+        10   // branch width
+      );
     }
-  }, [showFractal]);
+    /**
+     * ESLint requires "drawFractal" in dependencies because it is
+     * used inside useEffect. "showFractal" is also needed since the effect depends on that state.
+     */
+  }, [showFractal, drawFractal]);
 
-  // Handle the click event to show the fractal
   const handleClick = () => {
     setShowFractal(true);
   };
@@ -55,19 +93,18 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        {/* Original React logo & text */}
+        {/* Original React logo and text */}
         <img src={logo} className="App-logo" alt="logo" />
-
         <p>
-          Edit <code>src/App.js</code> and save to reload.
+          Edit <code>src/App.jsx</code> and save to reload.
         </p>
 
-        {/* Button triggers fractal drawing */}
+        {/* Button to trigger fractal drawing */}
         <button onClick={handleClick} className="App-button">
           Click Me
         </button>
 
-        {/* Canvas for drawing the fractal */}
+        {/* Canvas for the fractal */}
         <canvas
           ref={canvasRef}
           width={600}
